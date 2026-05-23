@@ -17,7 +17,7 @@ uint8_t buzzerPin = 8; // D8 (PB0), PWM Out
 // obiecte si timp
 Adafruit_ILI9341 tft = Adafruit_ILI9341(TFT_CS, TFT_DC, TFT_RST); // biblioteca desenare init
 Rtc_Pcf8563 rtc;
-int lastMinute;
+uint8_t lastMinute;
 unsigned long lastMoveTime = 0;
 
 // constante joc si dimensiuni
@@ -38,8 +38,8 @@ const int screenHeight = 240;
 #define NOTE_A4  440
 #define NOTE_B4  494
 #define NOTE_C5  523
-int win_melody[6] = {NOTE_C4, NOTE_D4, NOTE_E4, NOTE_F4};
-int lose_melody[6] = {NOTE_F4, NOTE_E4, NOTE_D4, NOTE_C4};
+const int win_melody[6] = {NOTE_C4, NOTE_D4, NOTE_E4, NOTE_F4};
+const int lose_melody[6] = {NOTE_F4, NOTE_E4, NOTE_D4, NOTE_C4};
 int noteDuration = 500;
 bool melodyPlayed = false;
 
@@ -48,7 +48,7 @@ enum STATE { MAIN_MENU_STATE, LEVEL_CHOOSE_STATE, GAME_STATE, GAME_INFO_STATE, F
 STATE global_state = MAIN_MENU_STATE;
 
 struct booster {
-  char name[10];
+  char type;
   int positionX, positionY;
 };
 struct menu_item {
@@ -69,7 +69,7 @@ Obstacle patternLevel[4] = {
   {64, 144, 48, 48},
   {208, 144, 48, 48}
 };
-int countSimple = 4;
+uint8_t countSimple = 4;
 
 // nivel obstacol 2
 Obstacle patternLevelHard[6] = {
@@ -80,43 +80,42 @@ Obstacle patternLevelHard[6] = {
   {0, 180, 150, 20},
   {190, 200, 100, 20}
 };
-int countComplex = 6;
+uint8_t countComplex = 6;
 
 Obstacle *currentMap = patternLevel;
-int currentCount = 4;
+uint8_t currentCount = 4;
 
 // variabile sarpe si miscare
 int snakeX[SNAKE_WIN_LENGTH + 2], snakeY[SNAKE_WIN_LENGTH + 2];
-int dirX = 1, dirY = 0;
-int currentSnakeLength = 4; // startLength
-// int winningLength = SNAKE_WIN_LENGTH;
+int8_t dirX = 1, dirY = 0;
+uint8_t currentSnakeLength = 4; // startLength
 
 // variabile joc (scor, fructe, nivel)
-int totalScore = 0;
-int startLength = 4;
+uint8_t totalScore = 0;
+uint8_t startLength = 4;
 int gameSpeed = 150;
 int randomNumber;
-int maximumFruits = 3;
+uint8_t maximumFruits = 3;
 int fruitX[3], fruitY[3];
-int totalFruits = 0;
-int currentLevel;
+uint8_t totalFruits = 0;
+uint8_t currentLevel;
 bool win = false;
 
 // logica boostere
 unsigned long boosterExpireTime = 0; // efect booster temporar
 bool isSlowed = false;
-const int NORMAL_SPEED = 150;
-const int SLOW_SPEED = 250;
+const uint8_t NORMAL_SPEED = 150;
+const uint8_t SLOW_SPEED = 250;
 const long BOOSTER_DURATION = 10000; // 10 sec slowdown
-int maximumBoosters = 1;
-int currentBoosters = 0;
+uint8_t maximumBoosters = 1;
+uint8_t currentBoosters = 0;
 bool destroyBoosterTaken = false;
 booster booster;
 
 // logica meniu
 struct menu_item menu_items[3] = { {"New Game", 0}, {"Game Info", 1}};
-int currentButton = 0;
-int menuItemsLength = 2;
+uint8_t currentButton = 0;
+uint8_t menuItemsLength = 2;
 
 void setup() {
   Serial.begin(9600);
@@ -139,20 +138,6 @@ void loop() {
   int posX = analogRead(JOY_HORZ);
   int posY = analogRead(JOY_VERT);
   int click = digitalRead(JOY_BUTTON);
-
-  // Serial.print("Valoare: ");
-  // Serial.println(posY);
-  // Serial.println();
-
-  // choose menu option
-  // if (posY > 600) {
-  //   currentButton = (currentButton + 1) % menuItemsLength;
-  //   delay(200);
-  // } else if (posY < 400) {
-  //   currentButton = (currentButton - 1);
-  //   if (currentButton < 0) currentButton = menuItemsLength - 1;
-  //   delay(200);
-  // }
 
   switch (global_state) {
     case MAIN_MENU_STATE:
@@ -195,13 +180,6 @@ void chooseMapBasedOnTime() {
 
   if (elapsed >= 2 && global_state != GAME_STATE) {
     lastMinute = current_minute;
-    Serial.println("mapa schimbata");
-    Serial.print("Timp RTC: ");
-    Serial.print(rtc.getHour());
-    Serial.print(":");
-    Serial.print(rtc.getMinute());
-    Serial.print(":");
-    Serial.println(rtc.getSecond());
 
     if (currentCount == countSimple) {
       currentCount = countComplex;
@@ -287,7 +265,6 @@ void updateGame() {
         tone(buzzerPin, NOTE_D4, noteDuration / 3);
 
         currentSnakeLength++;
-        // totalScore += random(50, 80);
         totalScore++;
       }
       
@@ -310,10 +287,10 @@ void updateGame() {
     currentBoosters = 0;
     tone(buzzerPin, NOTE_C4, 100);
 
-    if (strcmp(booster.name, "destroy") == 0) {
+    if (booster.type == 'd') {
         destroyBoosterTaken = true;
         destroyObstacles();
-    } else if (strcmp(booster.name, "slow") == 0) {
+    } else if (booster.type == 's') {
         isSlowed = true;
         boosterExpireTime = millis() + BOOSTER_DURATION; // timp expirare
         gameSpeed = SLOW_SPEED;
@@ -448,14 +425,13 @@ void spawnBooster() {
 
   booster.positionX = newX;
   booster.positionY = newY;
-  booster.name[0] = 0;
 
   long randomNameNum = random(0, 2);
   if (randomNameNum == 0) {
-    strcpy(booster.name, "destroy");
+    booster.type = 'd';
     tft.fillRect(booster.positionX, booster.positionY, GRID_SIZE, GRID_SIZE, ILI9341_YELLOW);
   } else {
-    strcpy(booster.name, "slow");
+    booster.type = 's';
     tft.fillRect(booster.positionX, booster.positionY, GRID_SIZE, GRID_SIZE, ILI9341_BLUE);
   }
 }
@@ -473,20 +449,16 @@ void drawMainMenu(int clicked) {
   tft.setCursor(100, 50);
   tft.setTextColor(ILI9341_GREEN);
   tft.setTextSize(3);
-  tft.print("SNAKE C");
+  tft.print(F("SNAKE C"));
 
   tft.setCursor(40, 100);
   tft.setTextColor(currentButton == 0 ? ILI9341_WHITE : ILI9341_GREEN);
   tft.setTextSize(2);
-  tft.print("New Game ");
+  tft.print(F("New Game "));
 
   tft.setCursor(40, 130);
   tft.setTextColor(currentButton == 1 ? ILI9341_WHITE : ILI9341_GREEN);
-  tft.print("Game Info");
-
-  // tft.setCursor(40, 160);
-  // tft.setTextColor(currentButton == 2 ? ILI9341_WHITE : ILI9341_GREEN);
-  // tft.print("Exit     ");
+  tft.print(F("Game Info"));
 
   if (clicked == LOW) {
     delay(250);
@@ -518,20 +490,20 @@ void drawLevelMenu(int clicked) {
   tft.setCursor(100, 50);
   tft.setTextColor(ILI9341_GREEN);
   tft.setTextSize(3);
-  tft.print("SNAKE C");
+  tft.print(F("SNAKE C"));
 
   tft.setCursor(40, 100);
   tft.setTextColor(currentButton == 0 ? ILI9341_WHITE : ILI9341_GREEN);
   tft.setTextSize(2);
-  tft.print("Tutorial");
+  tft.print(F("Tutorial"));
 
   tft.setCursor(40, 130);
   tft.setTextColor(currentButton == 1 ? ILI9341_WHITE : ILI9341_GREEN);
-  tft.print("Level");
+  tft.print(F("Level"));
 
   tft.setCursor(40, 160);
   tft.setTextColor(currentButton == 2 ? ILI9341_WHITE : ILI9341_GREEN);
-  tft.print("Back");
+  tft.print(F("Back"));
 
   if (clicked == LOW) {
     delay(250);
@@ -558,35 +530,33 @@ void drawLevelMenu(int clicked) {
 void drawGameInfoMenu(int clicked) {
   if (global_state != GAME_INFO_STATE) return;
 
-  // Serial.println("drawGameInfoMenu");
-
   tft.setCursor(20, 10);
   tft.setTextColor(ILI9341_WHITE);
   tft.setTextSize(2);
-  tft.print("Go Back");
+  tft.print(F("Go Back"));
   
   tft.setCursor(100, 50);
   tft.setTextColor(ILI9341_GREEN);
   tft.setTextSize(3);
-  tft.print("SNAKE C");
+  tft.print(F("SNAKE C"));
 
   tft.setCursor(60, 100);
   tft.setTextColor(ILI9341_GREEN);
   tft.setTextSize(2);
   tft.fillRect(40, 100, GRID_SIZE, GRID_SIZE, ILI9341_RED);
-  tft.print("Eat Fruits");
+  tft.print(F("Eat Fruits"));
 
   tft.setCursor(60, 150);
   tft.setTextColor(ILI9341_GREEN);
   tft.setTextSize(2);
   tft.fillRect(40, 150, GRID_SIZE, GRID_SIZE, ILI9341_YELLOW);
-  tft.print("Destroy obstacles");
+  tft.print(F("Destroy obstacles"));
 
   tft.setCursor(60, 200);
   tft.setTextColor(ILI9341_GREEN);
   tft.setTextSize(2);
   tft.fillRect(40, 200, GRID_SIZE, GRID_SIZE, ILI9341_BLUE);
-  tft.print("Slow down");
+  tft.print(F("Slow down"));
 
   if (clicked == LOW) {
     delay(250);
@@ -615,7 +585,7 @@ void drawGameEndScene(int clicked) {
   tft.setCursor(40, 140);
   tft.setTextColor(ILI9341_WHITE);
   tft.setTextSize(2);
-  tft.print("Your score: ");
+  tft.print(F("Your score: "));
   tft.print(totalScore);
 
   if (win == true) {
